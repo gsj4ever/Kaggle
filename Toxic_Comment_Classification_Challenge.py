@@ -6,7 +6,7 @@ import pandas as pd
 from nltk.corpus import stopwords
 from keras.preprocessing import text, sequence
 from keras.models import Sequential
-from keras.layers import Embedding, Bidirectional, LSTM, GRU, Dropout, Dense, GlobalMaxPool1D
+from keras.layers import Embedding, Bidirectional, LSTM, GRU, Dropout, Dense, GlobalAveragePooling1D
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 
 # Read data from files
@@ -18,7 +18,7 @@ test = pd.read_csv(path_prefix + 'test.csv')
 #Prepare data
 print("Pre-processing data for training and testing ...")
 stop = stopwords.words('english')
-dict_size = 20000
+dict_size = 50000
 max_len = 100
 
 col_names = train.columns.values.tolist()  # just simply type list(Dataframe)
@@ -31,9 +31,9 @@ tokenizer = text.Tokenizer(num_words=dict_size)
 tokenizer.fit_on_texts(train_refine)
 train_seq = tokenizer.texts_to_sequences(train_refine)
 test_seq = tokenizer.texts_to_sequences(test_refine)
-train_pad = sequence.pad_sequences(train_seq, maxlen=max_len, padding='post')
+train_pad = sequence.pad_sequences(train_seq, maxlen=max_len, padding='post', truncating='post')
 # print(train_pad)
-test_pad = sequence.pad_sequences(test_seq, maxlen=max_len, padding='post')
+test_pad = sequence.pad_sequences(test_seq, maxlen=max_len, padding='post', truncating='post')
 train_Y = train[classes]
 
 # The model
@@ -42,8 +42,9 @@ model = Sequential()
 model.add(Embedding(dict_size, 128))
 model.add(Bidirectional(GRU(max_len, return_sequences=True)))
 model.add(Dropout(0.2))
-model.add(Bidirectional(GRU(max_len, return_sequences=False)))
-model.add(Dropout(0.2))
+model.add(Bidirectional(GRU(max_len, return_sequences=True)))
+model.add(GlobalAveragePooling1D())
+model.add(Dropout(0.1))
 model.add(Dense(6, activation='sigmoid'))
 
 model.compile(optimizer='rmsprop',
@@ -53,7 +54,7 @@ model.compile(optimizer='rmsprop',
 weight_file = path_prefix + 'model_weights.hdf5'
 checkpoint = ModelCheckpoint(filepath=weight_file, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 early_stopping = EarlyStopping(monitor="val_loss", mode="min", patience=0)
-model.fit(train_pad, train_Y, batch_size=32, epochs=3, validation_split=0.1, callbacks=[checkpoint, early_stopping])
+model.fit(train_pad, train_Y, batch_size=32, epochs=5, validation_split=0.1, callbacks=[checkpoint, early_stopping])
 
 # Test the model
 print("Predicting test result and generate submission file ...")
