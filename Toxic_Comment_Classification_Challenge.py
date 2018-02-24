@@ -30,7 +30,7 @@ train_refine = train_text.apply(lambda x: [item for item in x if item not in sto
 test_text = test['comment_text'].fillna("foobar").str.lower().str.replace(r'[\W0-9]+', ' ').str.strip().str.split()
 test_refine = test_text.apply(lambda x: [item for item in x if item not in stop]).str.join(' ')
 tokenizer = text.Tokenizer(num_words=dict_size)
-tokenizer.fit_on_texts(train_refine)
+tokenizer.fit_on_texts(list(train_refine) + list(test_refine))
 train_seq = tokenizer.texts_to_sequences(train_refine)
 test_seq = tokenizer.texts_to_sequences(test_refine)
 train_pad = sequence.pad_sequences(train_seq, maxlen=max_len)
@@ -62,7 +62,7 @@ for word, i in word_index.items():
 
 
 model = Sequential()
-model.add(Embedding(dict_size, embed_size, weights=[embed_matrix]))
+model.add(Embedding(dict_size, embed_size, weights=[embed_matrix], trainable=True))
 model.add(Bidirectional(GRU(max_len, return_sequences=True, dropout=0.1, recurrent_dropout=0.1)))
 model.add(Dropout(0.1))
 model.add(Bidirectional(GRU(max_len, return_sequences=True, dropout=0.1, recurrent_dropout=0.1)))
@@ -70,14 +70,14 @@ model.add(GlobalMaxPooling1D())
 model.add(Dropout(0.1))
 model.add(Dense(6, activation='sigmoid'))
 
-model.compile(optimizer='rmsprop',
+model.compile(optimizer='adam',
               loss='binary_crossentropy',
               metrics=['accuracy'])
 
 weight_file = path_prefix + 'model_weights.hdf5'
 checkpoint = ModelCheckpoint(filepath=weight_file, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 early_stopping = EarlyStopping(monitor="val_loss", mode="min", patience=1)
-model.fit(train_pad, train_Y, batch_size=32, epochs=3, validation_split=0.1, callbacks=[checkpoint, early_stopping])
+model.fit(train_pad, train_Y, batch_size=32, epochs=5, validation_split=0.1, callbacks=[checkpoint, early_stopping])
 
 # Test the model
 print("Predicting ...")
